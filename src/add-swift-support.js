@@ -133,10 +133,12 @@ module.exports = context => {
 
             const currentRunpath = xcodeProject.getBuildProperty('LD_RUNPATH_SEARCH_PATHS', buildConfig.name);
 
-            if (!currentRunpath.includes('"@executable_path/Frameworks"')) {
-              const updatedRunpath = currentRunpath ? `${currentRunpath} "@executable_path/Frameworks"` : '"@executable_path/Frameworks"';
+            if (!currentRunpath.includes('@executable_path/Frameworks')) {
+              const updatedRunpath = currentRunpath ? `"${currentRunpath} @executable_path/Frameworks"` : '"@executable_path/Frameworks"';
               xcodeProject.updateBuildProperty('LD_RUNPATH_SEARCH_PATHS', updatedRunpath, buildConfig.name);
               console.log('Updated iOS build setting LD_RUNPATH_SEARCH_PATHS to include: @executable_path/Frameworks, keeping the previous ones.', 'for build configuration', buildConfig.name);
+            } else {
+              console.log('No need to update iOS build setting LD_RUNPATH_SEARCH_PATHS to include: @executable_path/Frameworks as it is already there.', 'for build configuration', buildConfig.name);
             }
 
             if (typeof xcodeProject.getBuildProperty('SWIFT_VERSION', buildConfig.name) === 'undefined') {
