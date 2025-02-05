@@ -18,9 +18,9 @@
 const fs = require('fs');
 const path = require('path');
 const xcode = require('xcode');
-const childProcess = require('child_process');
+const { exec } = require('child_process');
 const semver = require('semver');
-const glob = require('glob');
+const { glob } = require('glob');
 
 module.exports = context => {
   const projectRoot = context.opts.projectRoot;
@@ -93,79 +93,90 @@ module.exports = context => {
             xcodeProject.updateBuildProperty('SWIFT_OBJC_BRIDGING_HEADER', bridgingHeaderProperty, buildConfig.name);
             console.log('Update IOS build setting SWIFT_OBJC_BRIDGING_HEADER to:', bridgingHeaderProperty, 'for build configuration', buildConfig.name);
           }
+          if (xcodeProject.getBuildProperty('SWIFT_OBJC_INTERFACE_HEADER_NAME', buildConfig.name) !== '"OutSystems-Swift.h"') {
+            xcodeProject.updateBuildProperty('SWIFT_OBJC_INTERFACE_HEADER_NAME', '"OutSystems-Swift.h"', buildConfig.name);
+            console.log('Update IOS build setting SWIFT_OBJC_INTERFACE_HEADER_NAME to:', '"OutSystems-Swift.h"', 'for build configuration', buildConfig.name);
+          }
         }
       }
 
       // Look for any bridging header defined in the plugin
-      glob('**/*Bridging-Header*.h', { cwd: pluginsPath }, (error, files) => {
-        const bridgingHeader = path.basename(bridgingHeaderPath);
-        const headers = files.map((filePath) => path.basename(filePath));
+      async function processBridgingHeaders() {
+        try {
+          // Use the promise-based `glob`
+          const files = await glob('**/*Bridging-Header*.h', { cwd: pluginsPath });
 
-        // if other bridging headers are found, they are imported in the
-        // one already configured in the project.
-        let content = fs.readFileSync(bridgingHeaderPath, 'utf-8');
+          const bridgingHeader = path.basename(bridgingHeaderPath);
+          const headers = files.map((filePath) => path.basename(filePath));
 
-        if (error) throw new Error(error);
+          // if other bridging headers are found, they are imported in the
+          // one already configured in the project.
+          let content = fs.readFileSync(bridgingHeaderPath, 'utf-8');
 
-        headers.forEach((header) => {
-          if (header !== bridgingHeader && !~content.indexOf(header)) {
-            if (content.charAt(content.length - 1) !== '\n') {
-              content += '\n';
+          headers.forEach((header) => {
+            if (header !== bridgingHeader && !~content.indexOf(header)) {
+              if (content.charAt(content.length - 1) !== '\n') {
+                content += '\n';
+              }
+              content += '#import "' + header + '"\n';
+              console.log('Importing', header, 'into', bridgingHeaderPath);
             }
-            content += '#import "' + header + '"\n';
-            console.log('Importing', header, 'into', bridgingHeaderPath);
-          }
-        });
-        fs.writeFileSync(bridgingHeaderPath, content, 'utf-8');
+          });
+          fs.writeFileSync(bridgingHeaderPath, content, 'utf-8');
 
-        for (configName in buildConfigs) {
-          if (!COMMENT_KEY.test(configName)) {
-            buildConfig = buildConfigs[configName];
-            if (parseFloat(xcodeProject.getBuildProperty('IPHONEOS_DEPLOYMENT_TARGET', buildConfig.name)) < parseFloat(IOS_MIN_DEPLOYMENT_TARGET)) {
-              xcodeProject.updateBuildProperty('IPHONEOS_DEPLOYMENT_TARGET', IOS_MIN_DEPLOYMENT_TARGET, buildConfig.name);
-              console.log('Update IOS project deployment target to:', IOS_MIN_DEPLOYMENT_TARGET, 'for build configuration', buildConfig.name);
-            }
+          for (configName in buildConfigs) {
+            if (!COMMENT_KEY.test(configName)) {
+              buildConfig = buildConfigs[configName];
+              if (parseFloat(xcodeProject.getBuildProperty('IPHONEOS_DEPLOYMENT_TARGET', buildConfig.name)) < parseFloat(IOS_MIN_DEPLOYMENT_TARGET)) {
+                xcodeProject.updateBuildProperty('IPHONEOS_DEPLOYMENT_TARGET', IOS_MIN_DEPLOYMENT_TARGET, buildConfig.name);
+                console.log('Update IOS project deployment target to:', IOS_MIN_DEPLOYMENT_TARGET, 'for build configuration', buildConfig.name);
+              }
 
-            if (xcodeProject.getBuildProperty('ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES', buildConfig.name) !== 'YES') {
-              xcodeProject.updateBuildProperty('ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES', 'YES', buildConfig.name);
-              console.log('Update IOS build setting ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES to: YES', 'for build configuration', buildConfig.name);
-            }
+              if (xcodeProject.getBuildProperty('ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES', buildConfig.name) !== 'YES') {
+                xcodeProject.updateBuildProperty('ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES', 'YES', buildConfig.name);
+                console.log('Update IOS build setting ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES to: YES', 'for build configuration', buildConfig.name);
+              }
 
-            const currentRunpath = xcodeProject.getBuildProperty('LD_RUNPATH_SEARCH_PATHS', buildConfig.name);
+              const currentRunpath = xcodeProject.getBuildProperty('LD_RUNPATH_SEARCH_PATHS', buildConfig.name);
 
-            if (!currentRunpath.includes('@executable_path/Frameworks')) {
-              const updatedRunpath = currentRunpath ? `"${currentRunpath} @executable_path/Frameworks"` : '"@executable_path/Frameworks"';
-              xcodeProject.updateBuildProperty('LD_RUNPATH_SEARCH_PATHS', updatedRunpath, buildConfig.name);
-              console.log('Updated iOS build setting LD_RUNPATH_SEARCH_PATHS to include: @executable_path/Frameworks, keeping the previous ones.', 'for build configuration', buildConfig.name);
-            } else {
-              console.log('No need to update iOS build setting LD_RUNPATH_SEARCH_PATHS to include: @executable_path/Frameworks as it is already there.', 'for build configuration', buildConfig.name);
-            }
-
-            if (typeof xcodeProject.getBuildProperty('SWIFT_VERSION', buildConfig.name) === 'undefined') {
-              if (config.getPreference('UseLegacySwiftLanguageVersion', 'ios')) {
-                xcodeProject.updateBuildProperty('SWIFT_VERSION', '2.3', buildConfig.name);
-                console.log('Use legacy Swift language version', buildConfig.name);
-              } else if (config.getPreference('UseSwiftLanguageVersion', 'ios')) {
-                const swiftVersion = config.getPreference('UseSwiftLanguageVersion', 'ios');
-                xcodeProject.updateBuildProperty('SWIFT_VERSION', swiftVersion, buildConfig.name);
-                console.log('Use Swift language version', swiftVersion);
+              if (!currentRunpath.includes('@executable_path/Frameworks')) {
+                const updatedRunpath = currentRunpath ? `"${currentRunpath} @executable_path/Frameworks"` : '"@executable_path/Frameworks"';
+                xcodeProject.updateBuildProperty('LD_RUNPATH_SEARCH_PATHS', updatedRunpath, buildConfig.name);
+                console.log('Updated iOS build setting LD_RUNPATH_SEARCH_PATHS to include: @executable_path/Frameworks, keeping the previous ones.', 'for build configuration', buildConfig.name);
               } else {
-                xcodeProject.updateBuildProperty('SWIFT_VERSION', '5.0', buildConfig.name);
-                console.log('Update SWIFT version to 5.0', buildConfig.name);
+                console.log('No need to update iOS build setting LD_RUNPATH_SEARCH_PATHS to include: @executable_path/Frameworks as it is already there.', 'for build configuration', buildConfig.name);
               }
-            }
 
-            if (buildConfig.name === 'Debug') {
-              if (xcodeProject.getBuildProperty('SWIFT_OPTIMIZATION_LEVEL', buildConfig.name) !== '"-Onone"') {
-                xcodeProject.updateBuildProperty('SWIFT_OPTIMIZATION_LEVEL', '"-Onone"', buildConfig.name);
-                console.log('Update IOS build setting SWIFT_OPTIMIZATION_LEVEL to: -Onone', 'for build configuration', buildConfig.name);
+              if (typeof xcodeProject.getBuildProperty('SWIFT_VERSION', buildConfig.name) === 'undefined') {
+                if (config.getPreference('UseLegacySwiftLanguageVersion', 'ios')) {
+                  xcodeProject.updateBuildProperty('SWIFT_VERSION', '2.3', buildConfig.name);
+                  console.log('Use legacy Swift language version', buildConfig.name);
+                } else if (config.getPreference('UseSwiftLanguageVersion', 'ios')) {
+                  const swiftVersion = config.getPreference('UseSwiftLanguageVersion', 'ios');
+                  xcodeProject.updateBuildProperty('SWIFT_VERSION', swiftVersion, buildConfig.name);
+                  console.log('Use Swift language version', swiftVersion);
+                } else {
+                  xcodeProject.updateBuildProperty('SWIFT_VERSION', '5.0', buildConfig.name);
+                  console.log('Update SWIFT version to 5.0', buildConfig.name);
+                }
+              }
+
+              if (buildConfig.name === 'Debug') {
+                if (xcodeProject.getBuildProperty('SWIFT_OPTIMIZATION_LEVEL', buildConfig.name) !== '"-Onone"') {
+                  xcodeProject.updateBuildProperty('SWIFT_OPTIMIZATION_LEVEL', '"-Onone"', buildConfig.name);
+                  console.log('Update IOS build setting SWIFT_OPTIMIZATION_LEVEL to: -Onone', 'for build configuration', buildConfig.name);
+                }
               }
             }
           }
-        }
 
-        fs.writeFileSync(pbxprojPath, xcodeProject.writeSync());
-      });
+          fs.writeFileSync(pbxprojPath, xcodeProject.writeSync());
+        } catch (error) {
+          console.error('Error while running glob:', error);
+        }
+      }
+
+      processBridgingHeaders();
     });
   }
 };
@@ -199,7 +210,7 @@ const getPlatformVersionsFromFileSystem = (context, projectRoot) => {
   const platformVersions = platformsOnFs.map(platform => {
     const script = path.join(projectRoot, 'platforms', platform, 'cordova', 'version');
     return new Promise((resolve, reject) => {
-      childProcess.exec('"' + script + '"', {}, (error, stdout, _) => {
+      exec('"' + script + '"', {}, (error, stdout, _) => {
         if (error) {
           reject(error);
           return;
