@@ -151,11 +151,19 @@ module.exports = context => {
                 console.log('Update IOS build setting ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES to: YES', 'for build configuration', buildConfig.name);
               }
 
+              // Cordova iOS 8's project template stores this as an array (e.g. ["\"$(inherited)\""]),
+              // while Cordova iOS 7's stores it as a single string (e.g. "\"@executable_path/Frameworks\"").
+              // Array.prototype.includes() does exact-element matching, so checking the raw array
+              // for the unquoted '@executable_path/Frameworks' substring always misses (each element
+              // carries embedded quote characters) - normalize to a list of bare (unquoted) entries
+              // first, then check and rebuild consistently for both shapes.
               const currentRunpath = xcodeProject.getBuildProperty('LD_RUNPATH_SEARCH_PATHS', buildConfig.name);
+              const runpathEntries = (Array.isArray(currentRunpath) ? currentRunpath : (currentRunpath ? [currentRunpath] : []))
+                .map(function (entry) { return entry.replace(/^"|"$/g, ''); });
 
-              if (!currentRunpath.includes('@executable_path/Frameworks')) {
-                const updatedRunpath = currentRunpath ? `"${currentRunpath} @executable_path/Frameworks"` : '"@executable_path/Frameworks"';
-                xcodeProject.updateBuildProperty('LD_RUNPATH_SEARCH_PATHS', updatedRunpath, buildConfig.name);
+              if (!runpathEntries.includes('@executable_path/Frameworks')) {
+                runpathEntries.push('@executable_path/Frameworks');
+                xcodeProject.updateBuildProperty('LD_RUNPATH_SEARCH_PATHS', runpathEntries.map(function (entry) { return `"${entry}"`; }), buildConfig.name);
                 console.log('Updated iOS build setting LD_RUNPATH_SEARCH_PATHS to include: @executable_path/Frameworks, keeping the previous ones.', 'for build configuration', buildConfig.name);
               } else {
                 console.log('No need to update iOS build setting LD_RUNPATH_SEARCH_PATHS to include: @executable_path/Frameworks as it is already there.', 'for build configuration', buildConfig.name);
