@@ -30,7 +30,6 @@
   "license": "Apache-2.0",
   "dependencies": {
     "glob": "11.1.0",
-    "q": "^1.5.1",
     "semver": "^7.7.1",
     "xcode": "^3.0.1"
   },
