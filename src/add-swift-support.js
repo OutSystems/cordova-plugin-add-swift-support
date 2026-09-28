@@ -64,13 +64,14 @@ module.exports = context => {
       pbxprojPath = path.join(platformPath, projectName + '.xcodeproj', 'project.pbxproj');
 
       // Cordova iOS 8+ uses a fixed 'App' project folder/name regardless of the app's display
-      // name; earlier versions named it after the app.
+      // name; earlier versions named it after the app. The .xcodeproj bundle is always a
+      // sibling of the project folder (both live directly under platforms/ios), not nested
+      // inside it.
       if (!fs.existsSync(pbxprojPath)) {
-        const fixedProjectPath = path.join(platformPath, 'App');
-        const fixedPbxprojPath = path.join(fixedProjectPath, 'App.xcodeproj', 'project.pbxproj');
+        const fixedPbxprojPath = path.join(platformPath, 'App.xcodeproj', 'project.pbxproj');
         if (fs.existsSync(fixedPbxprojPath)) {
           projectName = 'App';
-          projectPath = fixedProjectPath;
+          projectPath = path.join(platformPath, projectName);
           pbxprojPath = fixedPbxprojPath;
         }
       }
