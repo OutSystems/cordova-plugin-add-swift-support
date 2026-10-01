@@ -1,3 +1,13 @@
+## [2.0.3-OS3]
+
+### 2026-10-01
+
+- fix: Compatibility with Cordova iOS 8  (#11)
+- fix: Remediate vulnerabilities in package.json (#10)
+- chore: add CODEOWNERS and automate releases (#12)
+- chore: sync package-lock.json
+
+
 # Changelog (old)
 =========
 
