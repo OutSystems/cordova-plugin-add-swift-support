@@ -1,4 +1,4 @@
-# Change Log
+# Changelog
 
 ## [2.0.2](https://github.com/akofman/cordova-plugin-add-swift-support/tree/2.0.2) (2019-04-05)
 [Full Changelog](https://github.com/akofman/cordova-plugin-add-swift-support/compare/2.0.1...2.0.2)
