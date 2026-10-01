@@ -1,4 +1,17 @@
-# Changelog
+# Changelog (old)
+=========
+
+## [2.0.3-OS2]
+
+- Improve `LD_RUNPATH_SEARCH_PATHS` Build Settings [#8](https://github.com/OutSystems/cordova-plugin-add-swift-support/pull/8)
+
+## [2.0.3-OS1]
+
+- Added configuration to call swift code from objective-c [#1](https://github.com/OutSystems/cordova-plugin-add-swift-support/pull/1)
+
+## [2.0.3-OS]
+
+- Compatibility with older MABS versions
 
 ## [2.0.2](https://github.com/akofman/cordova-plugin-add-swift-support/tree/2.0.2) (2019-04-05)
 [Full Changelog](https://github.com/akofman/cordova-plugin-add-swift-support/compare/2.0.1...2.0.2)
